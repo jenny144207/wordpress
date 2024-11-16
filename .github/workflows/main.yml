@@ -6,54 +6,62 @@ on:
       - main
 
 jobs:
-  deploy:
+  deploy-wordpress:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Setup WordPress Environment and Quick Tunnel
-      id: setup # Gán ID để sử dụng output
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install required packages
       run: |
-        # Cập nhật hệ thống và cài đặt các thư viện cần thiết
         sudo apt update
-        sudo apt install -y php php-mysql mysql-server curl unzip
+        sudo apt install -y apache2 php php-mysql mysql-server unzip wget
+        sudo systemctl start apache2
+        sudo systemctl enable apache2
 
-        # Tải về và giải nén WordPress
-        curl -o wordpress.zip https://wordpress.org/latest.zip
-        unzip wordpress.zip
-        sudo mv wordpress /var/www/html/
+    - name: Set up MySQL
+      run: |
+        sudo systemctl start mysql
+        sudo mysql -e "CREATE DATABASE wordpress;"
+        sudo mysql -e "CREATE USER 'wp_user'@'localhost' IDENTIFIED BY 'password';"
+        sudo mysql -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'wp_user'@'localhost';"
+        sudo mysql -e "FLUSH PRIVILEGES;"
 
-        # Cấu hình MySQL
-        sudo service mysql start
-        mysql -u root -e "CREATE DATABASE wordpress;"
-        mysql -u root -e "CREATE USER 'admin'@'localhost' IDENTIFIED BY 'admin';"
-        mysql -u root -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'admin'@'localhost';"
-        mysql -u root -e "FLUSH PRIVILEGES;"
+    - name: Download and install WordPress
+      run: |
+        wget https://wordpress.org/latest.zip
+        unzip latest.zip
+        sudo mv wordpress/* /var/www/html/
+        sudo chown -R www-data:www-data /var/www/html
+        sudo chmod -R 755 /var/www/html
 
-        # Cấu hình file wp-config.php
-        cp /var/www/html/wordpress/wp-config-sample.php /var/www/html/wordpress/wp-config.php
-        sed -i "s/database_name_here/wordpress/" /var/www/html/wordpress/wp-config.php
-        sed -i "s/username_here/admin/" /var/www/html/wordpress/wp-config.php
-        sed -i "s/password_here/admin/" /var/www/html/wordpress/wp-config.php
+        # Configure WordPress
+        cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php
+        sed -i "s/database_name_here/wordpress/" /var/www/html/wp-config.php
+        sed -i "s/username_here/wp_user/" /var/www/html/wp-config.php
+        sed -i "s/password_here/password/" /var/www/html/wp-config.php
 
-        # Chỉnh sửa trang index.php để hiển thị Hello World và nút đăng nhập
-        echo "<?php" > /var/www/html/wordpress/index.php
-        echo "echo \"<h1>Hello World</h1>\";" >> /var/www/html/wordpress/index.php
-        echo "echo '<a href=\"wp-login.php\">Admin Login</a>';" >> /var/www/html/wordpress/index.php
-        echo "echo '<p>Username: admin</p>';" >> /var/www/html/wordpress/index.php
-        echo "echo '<p>Password: admin</p>';" >> /var/www/html/wordpress/index.php
-        echo "?>" >> /var/www/html/wordpress/index.php
+    - name: Install Cloudflare Tunnel
+      run: |
+        curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+        sudo mv cloudflared /usr/local/bin
+        sudo chmod +x /usr/local/bin/cloudflared
 
-        # Tải về và cài đặt Cloudflare Tunnel
-        curl -o cloudflared-linux https://bin.equinox.io/c/VdrWdbjqyF/cloudflared-stable-linux-amd64
-        chmod +x cloudflared-linux
-        sudo mv cloudflared-linux /usr/local/bin/cloudflared
+    - name: Start Quick Tunnel
+      run: |
+        nohup cloudflared tunnel --url http://localhost &> tunnel.log &
+        sleep 5
+        TUNNEL_URL=$(grep -o 'https://[^ ]*' tunnel.log | head -1)
+        echo "TUNNEL_URL=$TUNNEL_URL" >> $GITHUB_ENV
 
-        # Khởi động WordPress
-        php -S 0.0.0.0:8000 -t /var/www/html/wordpress &
+    - name: Configure WordPress "Hello World" page
+      run: |
+        echo "<?php echo 'Hello World'; ?>" > /var/www/html/index.php
+        echo '<a href="/wp-login.php">Login as Admin</a>' >> /var/www/html/index.php
+        echo "<p>Admin Username: <b>admin</b></p>" >> /var/www/html/index.php
+        echo "<p>Admin Password: <b>admin</b></p>" >> /var/www/html/index.php
 
-        # Khởi chạy Cloudflare Tunnel và lấy URL
-        TUNNEL_URL=$(cloudflared tunnel --url http://localhost:8000 | grep -oP 'https://[^\s]+')
-        echo "tunnel_url=$TUNNEL_URL" >> $GITHUB_ENV
-
-    - name: Output Quick Tunnel URL
-      run: echo "Access your WordPress site at: ${{ env.tunnel_url }}"
+    - name: Display Quick Tunnel URL
+      run: |
+        echo "Access your WordPress site at: ${{ env.TUNNEL_URL }}"
