@@ -44,14 +44,8 @@ jobs:
         powershell -Command "(Get-Content C:\inetpub\wwwroot\wordpress\wp-config.php).Replace('username_here', 'wp_user') | Set-Content C:\inetpub\wwwroot\wordpress\wp-config.php"
         powershell -Command "(Get-Content C:\inetpub\wwwroot\wordpress\wp-config.php).Replace('password_here', 'password') | Set-Content C:\inetpub\wwwroot\wordpress\wp-config.php"
 
-    - name: Set up WordPress
-      run: |
-        mkdir C:\inetpub\wwwroot\wordpress
-        xcopy "C:\tools\wordpress\*" "C:\inetpub\wwwroot\wordpress" /E /I /Q /Y
-        copy "C:\inetpub\wwwroot\wordpress\wp-config-sample.php" "C:\inetpub\wwwroot\wordpress\wp-config.php"
-        powershell -Command "(Get-Content C:\inetpub\wwwroot\wordpress\wp-config.php).Replace('database_name_here', 'wordpress') | Set-Content C:\inetpub\wwwroot\wordpress\wp-config.php"
-        powershell -Command "(Get-Content C:\inetpub\wwwroot\wordpress\wp-config.php).Replace('username_here', 'wp_user') | Set-Content C:\inetpub\wwwroot\wordpress\wp-config.php"
-        powershell -Command "(Get-Content C:\inetpub\wwwroot\wordpress\wp-config.php).Replace('password_here', 'password') | Set-Content C:\inetpub\wwwroot\wordpress\wp-config.php"
+   
+       
 
     - name: Install Quick Tunnel (Cloudflare Tunnel)
       run: |
