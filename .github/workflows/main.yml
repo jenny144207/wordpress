@@ -22,16 +22,24 @@ jobs:
 
     - name: Set up MySQL
       run: |
+        # Khởi động MySQL dưới quyền root
         sudo systemctl start mysql
-        # Đặt mật khẩu cho user root
-        sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'root_password';"
-        sudo mysql -e "FLUSH PRIVILEGES;"
-        
-        # Tạo database và user
-        sudo mysql -uroot -proot_password -e "CREATE DATABASE wordpress;"
-        sudo mysql -uroot -proot_password -e "CREATE USER 'wp_user'@'localhost' IDENTIFIED BY 'password';"
-        sudo mysql -uroot -proot_password -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'wp_user'@'localhost';"
-        sudo mysql -uroot -proot_password -e "FLUSH PRIVILEGES;"
+        sudo systemctl enable mysql
+
+        # Đặt mật khẩu root mặc định là '123456'
+        sudo mysql --user=root <<-EOSQL
+          ALTER USER 'root'@'localhost' IDENTIFIED BY '123456';
+          FLUSH PRIVILEGES;
+        EOSQL
+
+        # Sử dụng mật khẩu root để tạo database và user
+        sudo mysql --user=root --password=123456 <<-EOSQL
+          CREATE DATABASE wordpress;
+          CREATE USER 'wp_user'@'localhost' IDENTIFIED BY 'password';
+          GRANT ALL PRIVILEGES ON wordpress.* TO 'wp_user'@'localhost';
+          FLUSH PRIVILEGES;
+        EOSQL
+
 
 
     - name: Download and install WordPress
