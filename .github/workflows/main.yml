@@ -49,10 +49,18 @@ jobs:
 
     - name: Install Quick Tunnel (Cloudflare Tunnel)
       run: |
+        # Tải cloudflared
         curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe -o cloudflared.exe
-        start /b cloudflared.exe tunnel --url http://localhost:80 > tunnel.log 2>&1
+        
+        # Chạy cloudflared tunnel và in ra URL
+        start /b .\cloudflared.exe tunnel --url http://localhost:80 > tunnel.log 2>&1
+        
+        # Đợi 5 giây để tunnel hoạt động
         timeout /t 5
-        FOR /F "tokens=*" %i IN ('findstr "https://" tunnel.log') DO @echo Quick Tunnel URL: %i
+        
+        # Lọc và hiển thị Quick Tunnel URL từ file log
+        powershell -Command "Get-Content tunnel.log | Select-String -Pattern 'https://' | ForEach-Object { $_.Line }"
+
 
     - name: Set up "Hello World" Page
       run: |
