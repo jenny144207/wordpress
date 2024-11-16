@@ -11,6 +11,7 @@ jobs:
 
     steps:
     - name: Setup WordPress Environment and Quick Tunnel
+      id: setup # Gán ID cho bước để sử dụng output sau này
       run: |
         # Cập nhật hệ thống và cài đặt các thư viện cần thiết
         sudo apt update
@@ -52,8 +53,7 @@ jobs:
 
         # Khởi chạy Cloudflare Tunnel và lấy URL
         TUNNEL_URL=$(cloudflared tunnel --url http://localhost:8000 | grep -oP 'https://[^\s]+')
-        echo "Tunnel URL: $TUNNEL_URL"
         echo "::set-output name=tunnel_url::$TUNNEL_URL"
 
     - name: Output Quick Tunnel URL
-      run: echo "Access your WordPress site at: ${{ steps.deploy.outputs.tunnel_url }}"
+      run: echo "Access your WordPress site at: ${{ steps.setup.outputs.tunnel_url }}"
