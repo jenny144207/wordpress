@@ -27,6 +27,22 @@ jobs:
         mysql -u root -p123456 -e "CREATE USER 'wp_user'@'localhost' IDENTIFIED BY 'password';"
         mysql -u root -p123456 -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'wp_user'@'localhost';"
         mysql -u root -p123456 -e "FLUSH PRIVILEGES;"
+    - name: Download and set up WordPress
+      run: |
+        # Tải WordPress
+        curl -o wordpress.zip https://wordpress.org/latest.zip
+        mkdir C:\wordpress
+        tar -xf wordpress.zip -C C:\wordpress --strip-components=1
+
+        # Sao chép WordPress vào thư mục web
+        mkdir C:\inetpub\wwwroot\wordpress
+        xcopy "C:\wordpress\*" "C:\inetpub\wwwroot\wordpress" /E /I /Q /Y
+
+        # Cấu hình WordPress
+        copy "C:\inetpub\wwwroot\wordpress\wp-config-sample.php" "C:\inetpub\wwwroot\wordpress\wp-config.php"
+        powershell -Command "(Get-Content C:\inetpub\wwwroot\wordpress\wp-config.php).Replace('database_name_here', 'wordpress') | Set-Content C:\inetpub\wwwroot\wordpress\wp-config.php"
+        powershell -Command "(Get-Content C:\inetpub\wwwroot\wordpress\wp-config.php).Replace('username_here', 'wp_user') | Set-Content C:\inetpub\wwwroot\wordpress\wp-config.php"
+        powershell -Command "(Get-Content C:\inetpub\wwwroot\wordpress\wp-config.php).Replace('password_here', 'password') | Set-Content C:\inetpub\wwwroot\wordpress\wp-config.php"
 
     - name: Set up WordPress
       run: |
