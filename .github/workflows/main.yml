@@ -1,4 +1,4 @@
-name: Deploy WordPress with Quick Tunnel
+name: Deploy WordPress on Windows
 
 on:
   push:
@@ -7,75 +7,46 @@ on:
 
 jobs:
   deploy-wordpress:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Install required packages
+    - name: Install required software
       run: |
-        sudo apt update
-        sudo apt install -y apache2 php php-mysql mysql-server unzip wget
-        sudo systemctl start apache2
-        sudo systemctl enable apache2
+        choco install -y mysql php php-cgi wordpress
+        setx PATH "%PATH%;C:\Program Files\MySQL\MySQL Server 8.0\bin"
+        setx PATH "%PATH%;C:\tools\php"
 
-    - name: Set up MySQL
+    - name: Configure MySQL
       run: |
-        # Khởi động MySQL dưới quyền root
-        sudo systemctl start mysql
-        sudo systemctl enable mysql
+        net start MySQL80
+        mysqladmin -u root password "123456"
+        mysql -u root -p123456 -e "CREATE DATABASE wordpress;"
+        mysql -u root -p123456 -e "CREATE USER 'wp_user'@'localhost' IDENTIFIED BY 'password';"
+        mysql -u root -p123456 -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'wp_user'@'localhost';"
+        mysql -u root -p123456 -e "FLUSH PRIVILEGES;"
 
-        # Đặt mật khẩu root mặc định là '123456'
-        sudo mysql --user=root <<-EOSQL
-          ALTER USER 'root'@'localhost' IDENTIFIED BY '123456';
-          FLUSH PRIVILEGES;
-        EOSQL
-
-        # Sử dụng mật khẩu root để tạo database và user
-        sudo mysql --user=root --password=123456 <<-EOSQL
-          CREATE DATABASE wordpress;
-          CREATE USER 'wp_user'@'localhost' IDENTIFIED BY 'password';
-          GRANT ALL PRIVILEGES ON wordpress.* TO 'wp_user'@'localhost';
-          FLUSH PRIVILEGES;
-        EOSQL
-
-
-
-    - name: Download and install WordPress
+    - name: Set up WordPress
       run: |
-        wget https://wordpress.org/latest.zip
-        unzip latest.zip
-        sudo mv wordpress/* /var/www/html/
-        sudo chown -R www-data:www-data /var/www/html
-        sudo chmod -R 755 /var/www/html
+        mkdir C:\inetpub\wwwroot\wordpress
+        xcopy "C:\tools\wordpress\*" "C:\inetpub\wwwroot\wordpress" /E /I /Q /Y
+        copy "C:\inetpub\wwwroot\wordpress\wp-config-sample.php" "C:\inetpub\wwwroot\wordpress\wp-config.php"
+        powershell -Command "(Get-Content C:\inetpub\wwwroot\wordpress\wp-config.php).Replace('database_name_here', 'wordpress') | Set-Content C:\inetpub\wwwroot\wordpress\wp-config.php"
+        powershell -Command "(Get-Content C:\inetpub\wwwroot\wordpress\wp-config.php).Replace('username_here', 'wp_user') | Set-Content C:\inetpub\wwwroot\wordpress\wp-config.php"
+        powershell -Command "(Get-Content C:\inetpub\wwwroot\wordpress\wp-config.php).Replace('password_here', 'password') | Set-Content C:\inetpub\wwwroot\wordpress\wp-config.php"
 
-        # Configure WordPress
-        cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php
-        sed -i "s/database_name_here/wordpress/" /var/www/html/wp-config.php
-        sed -i "s/username_here/wp_user/" /var/www/html/wp-config.php
-        sed -i "s/password_here/password/" /var/www/html/wp-config.php
-
-    - name: Install Cloudflare Tunnel
+    - name: Install Quick Tunnel (Cloudflare Tunnel)
       run: |
-        curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
-        sudo mv cloudflared /usr/local/bin
-        sudo chmod +x /usr/local/bin/cloudflared
+        curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe -o cloudflared.exe
+        start /b cloudflared.exe tunnel --url http://localhost:80 > tunnel.log 2>&1
+        timeout /t 5
+        FOR /F "tokens=*" %i IN ('findstr "https://" tunnel.log') DO @echo Quick Tunnel URL: %i
 
-    - name: Start Quick Tunnel
+    - name: Set up "Hello World" Page
       run: |
-        nohup cloudflared tunnel --url http://localhost &> tunnel.log &
-        sleep 5
-        TUNNEL_URL=$(grep -o 'https://[^ ]*' tunnel.log | head -1)
-        echo "TUNNEL_URL=$TUNNEL_URL" >> $GITHUB_ENV
-
-    - name: Configure WordPress "Hello World" page
-      run: |
-        echo "<?php echo 'Hello World'; ?>" > /var/www/html/index.php
-        echo '<a href="/wp-login.php">Login as Admin</a>' >> /var/www/html/index.php
-        echo "<p>Admin Username: <b>admin</b></p>" >> /var/www/html/index.php
-        echo "<p>Admin Password: <b>admin</b></p>" >> /var/www/html/index.php
-
-    - name: Display Quick Tunnel URL
-      run: |
-        echo "Access your WordPress site at: ${{ env.TUNNEL_URL }}"
+        echo "<?php echo 'Hello World'; ?>" > C:\inetpub\wwwroot\wordpress\index.php
+        echo '<a href="/wp-login.php">Login as Admin</a>' >> C:\inetpub\wwwroot\wordpress\index.php
+        echo "<p>Admin Username: <b>admin</b></p>" >> C:\inetpub\wwwroot\wordpress\index.php
+        echo "<p>Admin Password: <b>admin</b></p>" >> C:\inetpub\wwwroot\wordpress\index.php
